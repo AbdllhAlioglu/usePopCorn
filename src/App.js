@@ -3,7 +3,7 @@ import StarRating from "./StarRating";
 
 const average = (arr) => arr.reduce((acc, cur) => acc + cur / arr.length, 0);
 
-const KEY = "273e2584";
+const KEY = process.env.REACT_APP_OMDB_API_KEY;
 
 export default function App() {
   const [query, setQuery] = useState("");
@@ -40,8 +40,15 @@ export default function App() {
       try {
         setIsLoading(true);
         setError("");
+
+        if (!KEY) {
+          throw new Error(
+            "API anahtarı bulunamadı. Lütfen .env.local dosyasını kontrol edin."
+          );
+        }
+
         const res = await fetch(
-          `http://www.omdbapi.com/?apikey=${KEY}&s=${query}`
+          `https://www.omdbapi.com/?apikey=${KEY}&s=${query}`
         );
 
         if (!res.ok) {
@@ -75,14 +82,7 @@ export default function App() {
       </Navbar>
 
       <Main>
-        <Box className="content">
-          {isLoading && <Loader />}
-          {!isLoading && !error && (
-            <MovieList movies={movies} onSelectMovie={handleSelectMovie} />
-          )}
-          {error && <ErrorMessage message={error} />}
-        </Box>
-        <Box>
+        <Box className="box-left">
           {selectedId ? (
             <MovieDetails
               selectedId={selectedId}
@@ -92,13 +92,21 @@ export default function App() {
             />
           ) : (
             <>
-              <WatchedSummary watched={watched} />
-              <WatchedMovieList
-                watched={watched}
-                onDeleteWatched={handleDeleteWatched}
-              />
+              {isLoading && <Loader />}
+              {!isLoading && !error && (
+                <MovieList movies={movies} onSelectMovie={handleSelectMovie} />
+              )}
+              {error && <ErrorMessage message={error} />}
             </>
           )}
+        </Box>
+
+        <Box className="box-right">
+          <WatchedSummary watched={watched} />
+          <WatchedMovieList
+            watched={watched}
+            onDeleteWatched={handleDeleteWatched}
+          />
         </Box>
       </Main>
     </>
@@ -124,8 +132,8 @@ function Navbar({ children }) {
 function Logo() {
   return (
     <div className="logo">
-      <span role="img">🍿</span>
-      <h1>usePopcorn</h1>
+      <span role="img">🎬</span>
+      <h1>CineMagic</h1>
     </div>
   );
 }
@@ -257,11 +265,21 @@ function MovieDetails({ selectedId, onCloseMovie, isLoading, onAddWatched }) {
   }, [onCloseMovie]);
   useEffect(() => {
     async function getMovieDetail() {
-      const res = await fetch(
-        `http://www.omdbapi.com/?apikey=${KEY}&i=${selectedId}`
-      );
-      const data = await res.json();
-      setMovie(data);
+      try {
+        if (!KEY) {
+          throw new Error(
+            "API anahtarı bulunamadı. Lütfen .env.local dosyasını kontrol edin."
+          );
+        }
+
+        const res = await fetch(
+          `https://www.omdbapi.com/?apikey=${KEY}&i=${selectedId}`
+        );
+        const data = await res.json();
+        setMovie(data);
+      } catch (error) {
+        console.error("Film detayları alınamadı:", error);
+      }
     }
     getMovieDetail();
   }, [selectedId]);
@@ -271,7 +289,7 @@ function MovieDetails({ selectedId, onCloseMovie, isLoading, onAddWatched }) {
       if (!title) return;
       document.title = `Movie | ${title}`;
       return function () {
-        document.title = "usePopcorn";
+        document.title = "CineMagic";
       };
     },
     [title]
@@ -329,14 +347,25 @@ function MovieDetails({ selectedId, onCloseMovie, isLoading, onAddWatched }) {
 
 function Movie({ movie, onSelectMovie }) {
   return (
-    <li onClick={() => onSelectMovie(movie.imdbID)}>
-      <img src={movie.Poster} alt={`${movie.Title} poster`} />
-      <h3>{movie.Title}</h3>
-      <div>
-        <p>
-          <span>🗓</span>
-          <span>{movie.Year}</span>
-        </p>
+    <li className="movie-card" onClick={() => onSelectMovie(movie.imdbID)}>
+      <div className="movie-poster">
+        <img
+          src={
+            movie.Poster && movie.Poster !== "N/A"
+              ? movie.Poster
+              : "https://via.placeholder.com/300x450?text=No+Image+Available"
+          }
+          alt={`${movie.Title} poster`}
+          onError={(e) => {
+            e.target.src =
+              "https://via.placeholder.com/300x450?text=No+Image+Available";
+          }}
+        />
+      </div>
+      <div className="movie-info">
+        <h3>
+          {movie.Title || "Unknown Title"} <span>({movie.Year || "N/A"})</span>
+        </h3>
       </div>
     </li>
   );
@@ -373,7 +402,7 @@ function WatchedSummary({ watched }) {
 
 function WatchedMovieList({ watched, onDeleteWatched }) {
   return (
-    <ul className="list">
+    <ul className="list list-watched">
       {watched.map((movie) => (
         <WatchedMovie
           movie={movie}
